@@ -15,7 +15,7 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ onNotificationClick, notificationCount }) => {
-  const { user } = useAuth();
+  const { user, isConfigured } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
@@ -26,14 +26,23 @@ const Dashboard: React.FC<DashboardProps> = ({ onNotificationClick, notification
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!isConfigured) {
+      // In demo mode, skip remote queries and stop loading
+      setLoading(false);
+      return;
+    }
     if (user) {
       fetchProducts();
       fetchNotifications();
     }
-  }, [user]);
+  }, [user, isConfigured]);
 
   const fetchProducts = async () => {
     try {
+      if (!isConfigured) {
+        setProducts([]);
+        return;
+      }
       if (!user?.id) {
         console.error('No user ID available');
         return;
@@ -49,8 +58,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onNotificationClick, notification
       setProducts(data || []);
     } catch (error) {
       console.error('Error fetching products:', error);
-      // Show user-friendly error message
-      alert('Failed to load products. Please refresh the page.');
     } finally {
       setLoading(false);
     }
@@ -58,6 +65,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onNotificationClick, notification
 
   const fetchNotifications = async () => {
     try {
+      if (!isConfigured) {
+        setNotifications([]);
+        return;
+      }
       if (!user?.id) {
         console.error('No user ID available');
         return;
