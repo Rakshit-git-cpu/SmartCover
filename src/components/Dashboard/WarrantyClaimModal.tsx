@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Shield, AlertCircle } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { Product } from '../../types';
 
@@ -34,6 +34,13 @@ const WarrantyClaimModal: React.FC<WarrantyClaimModalProps> = ({
     setLoading(true);
 
     try {
+      // In demo mode, skip network operations
+      if (!isSupabaseConfigured) {
+        onClaimSubmitted();
+        setFormData({ problem_description: '', contact_phone: '', preferred_contact_method: 'email' });
+        return;
+      }
+
       // Create warranty claim
       const { error: claimError } = await supabase
         .from('warranty_claims')

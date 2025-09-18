@@ -4,7 +4,7 @@ import Landing from './components/Auth/Landing';
 import Dashboard from './components/Dashboard/Dashboard';
 import Header from './components/Layout/Header';
 import { useState, useEffect } from 'react';
-import { supabase } from './lib/supabase';
+import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { Notification } from './types';
 
 const AppContent: React.FC = () => {
@@ -21,7 +21,7 @@ const AppContent: React.FC = () => {
   const fetchNotifications = async () => {
     try {
       // In demo mode, return empty notifications
-      if (!supabase) {
+      if (!isSupabaseConfigured || !user) {
         setNotifications([]);
         return;
       }

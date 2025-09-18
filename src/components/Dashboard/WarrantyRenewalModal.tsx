@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, RefreshCw, Calendar, Shield, CreditCard, CheckCircle } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { Product } from '../../types';
 
@@ -40,6 +40,17 @@ const WarrantyRenewalModal: React.FC<WarrantyRenewalModalProps> = ({
     setLoading(true);
 
     try {
+      // In demo mode, simulate success
+      if (!isSupabaseConfigured) {
+        setShowSuccess(true);
+        setTimeout(() => {
+          onRenewalComplete();
+          onClose();
+          setShowSuccess(false);
+        }, 1200);
+        return;
+      }
+
       // Calculate new warranty expiry date
       const currentExpiry = new Date(product.warranty_expires_at);
       const newExpiry = new Date(currentExpiry);
