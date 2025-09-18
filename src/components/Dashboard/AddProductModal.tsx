@@ -357,29 +357,17 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onPr
         console.log('User:', user);
       }
 
-      // Ensure user profile exists in users table
-      const { data: existingUser, error: userError } = await supabase
+      // Ensure user profile exists in users table using upsert to avoid race conditions
+      const { error: upsertError } = await supabase
         .from('users')
-        .select('id')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (userError) {
-        console.warn('User profile lookup warning:', userError);
-      }
-      if (!existingUser) {
-        const { error: profileError } = await supabase
-          .from('users')
-          .insert({
-            id: user.id,
-            email: user.email,
-            full_name: user.user_metadata?.full_name || 'User',
-          })
-          .select('id')
-          .maybeSingle();
-        if (profileError) {
-          throw new Error('Failed to create user profile. Please try again.');
-        }
+        .upsert({
+          id: user.id,
+          email: user.email,
+          full_name: user.user_metadata?.full_name || 'User',
+        }, { onConflict: 'id' });
+      if (upsertError) {
+        console.error('User profile upsert error:', upsertError);
+        throw new Error('Could not prepare your account profile. Please try again.');
       }
 
       // Calculate warranty expiry date
