@@ -366,8 +366,8 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onPr
           full_name: user.user_metadata?.full_name || 'User',
         }, { onConflict: 'id' });
       if (upsertError) {
-        console.error('User profile upsert error:', upsertError);
-        throw new Error('Could not prepare your account profile. Please try again.');
+        console.warn('User profile upsert failed, proceeding anyway:', upsertError);
+        // Non-blocking: continue with product creation. Products table references auth.users
       }
 
       // Calculate warranty expiry date
