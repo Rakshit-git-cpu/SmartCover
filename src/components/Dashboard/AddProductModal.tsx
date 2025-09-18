@@ -394,46 +394,20 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onPr
         invoiceUrl = publicUrl;
       }
 
-      // Insert product (with one retry creating profile on FK violation)
-      const insertProduct = async () => {
-        return await supabase
-          .from('products')
-          .insert({
-            user_id: user.id,
-            name: formData.name,
-            brand: formData.brand,
-            model: formData.model,
-            serial_number: formData.serial_number,
-            purchase_date: formData.purchase_date,
-            warranty_period: formData.warranty_period,
-            warranty_expires_at: warrantyExpiresAt.toISOString(),
-            invoice_url: invoiceUrl,
-          })
-          .select();
-      };
-
-      let { data, error } = await insertProduct();
-      if (error) {
-        const message = (error.message || '').toLowerCase();
-        const isFk = message.includes('foreign key') || message.includes('products_user_id_fkey') || message.includes('users');
-        if (isFk) {
-          // Attempt to create user profile then retry once
-          const { error: profileErr } = await supabase
-            .from('users')
-            .upsert({
-              id: user.id,
-              email: user.email,
-              full_name: user.user_metadata?.full_name || 'User',
-            }, { onConflict: 'id' });
-          if (!profileErr) {
-            const retry = await insertProduct();
-            data = retry.data;
-            error = retry.error as any;
-          } else {
-            console.warn('Profile upsert also failed:', profileErr);
-          }
-        }
-      }
+      // Insert product directly; profile is managed elsewhere
+      const { error } = await supabase
+        .from('products')
+        .insert({
+          user_id: user.id,
+          name: formData.name,
+          brand: formData.brand,
+          model: formData.model,
+          serial_number: formData.serial_number,
+          purchase_date: formData.purchase_date,
+          warranty_period: formData.warranty_period,
+          warranty_expires_at: warrantyExpiresAt.toISOString(),
+          invoice_url: invoiceUrl,
+        });
 
       if (error) throw error;
 
@@ -458,21 +432,16 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onPr
       alert('Product added successfully!');
     } catch (error: any) {
       console.error('Error adding product:', error);
-      let errorMessage = 'Failed to add product. Please try again.';
-      
-      if (error?.message) {
-        if (error.message.includes('duplicate key')) {
-          errorMessage = 'A product with this serial number already exists.';
-        } else if (error.message.includes('storage')) {
-          errorMessage = 'Failed to upload invoice. Please try again without the file.';
-        } else if (error.message.includes('permission')) {
-          errorMessage = 'Permission denied. Please make sure you are logged in.';
-        } else {
-          errorMessage = error.message;
-        }
+      const msg = (error?.message || '').toLowerCase();
+      if (msg.includes('duplicate')) {
+        alert('A product with this serial number already exists.');
+      } else if (msg.includes('storage')) {
+        alert('Failed to upload invoice. Please try again without the file.');
+      } else if (msg.includes('permission') || msg.includes('rls')) {
+        alert('Permission denied. Please make sure you are logged in.');
+      } else {
+        alert('Failed to add product. Please try again.');
       }
-      
-      alert(errorMessage);
     } finally {
       setLoading(false);
     }
