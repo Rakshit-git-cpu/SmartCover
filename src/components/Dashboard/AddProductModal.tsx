@@ -11,7 +11,7 @@ interface AddProductModalProps {
 }
 
 const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onProductAdded }) => {
-  const { user } = useAuth();
+  const { user, isConfigured } = useAuth();
   const [registrationMethod, setRegistrationMethod] = useState<'manual' | 'invoice' | null>(null);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -344,6 +344,14 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onPr
     setLoading(true);
 
     try {
+      // If Supabase isn't configured (demo mode), short-circuit gracefully
+      if (!isConfigured) {
+        onProductAdded();
+        resetForm();
+        alert('Demo mode: product not saved to database, but flow completed.');
+        return;
+      }
+
       if (debugMode) {
         console.log('Form data:', formData);
         console.log('User:', user);
@@ -354,23 +362,24 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onPr
         .from('users')
         .select('id')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
-      if (userError && userError.code === 'PGRST116') {
-        // User profile doesn't exist, create it
+      if (userError) {
+        console.warn('User profile lookup warning:', userError);
+      }
+      if (!existingUser) {
         const { error: profileError } = await supabase
           .from('users')
           .insert({
             id: user.id,
             email: user.email,
             full_name: user.user_metadata?.full_name || 'User',
-          });
-
+          })
+          .select('id')
+          .maybeSingle();
         if (profileError) {
-          throw new Error('Failed to create user profile. Please try logging out and back in.');
+          throw new Error('Failed to create user profile. Please try again.');
         }
-      } else if (userError) {
-        throw new Error('User profile error. Please try logging out and back in.');
       }
 
       // Calculate warranty expiry date
