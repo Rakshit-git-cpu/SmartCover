@@ -357,19 +357,6 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onPr
         console.log('User:', user);
       }
 
-      // Ensure user profile exists in users table using upsert to avoid race conditions
-      const { error: upsertError } = await supabase
-        .from('users')
-        .upsert({
-          id: user.id,
-          email: user.email,
-          full_name: user.user_metadata?.full_name || 'User',
-        }, { onConflict: 'id' });
-      if (upsertError) {
-        console.warn('User profile upsert failed, proceeding anyway:', upsertError);
-        // Non-blocking: continue with product creation. Products table references auth.users
-      }
-
       // Calculate warranty expiry date
       const purchaseDate = new Date(formData.purchase_date);
       if (isNaN(purchaseDate.getTime())) {
@@ -407,21 +394,46 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onPr
         invoiceUrl = publicUrl;
       }
 
-      // Insert product
-      const { data, error } = await supabase
-        .from('products')
-        .insert({
-          user_id: user.id,
-          name: formData.name,
-          brand: formData.brand,
-          model: formData.model,
-          serial_number: formData.serial_number,
-          purchase_date: formData.purchase_date,
-          warranty_period: formData.warranty_period,
-          warranty_expires_at: warrantyExpiresAt.toISOString(),
-          invoice_url: invoiceUrl,
-        })
-        .select();
+      // Insert product (with one retry creating profile on FK violation)
+      const insertProduct = async () => {
+        return await supabase
+          .from('products')
+          .insert({
+            user_id: user.id,
+            name: formData.name,
+            brand: formData.brand,
+            model: formData.model,
+            serial_number: formData.serial_number,
+            purchase_date: formData.purchase_date,
+            warranty_period: formData.warranty_period,
+            warranty_expires_at: warrantyExpiresAt.toISOString(),
+            invoice_url: invoiceUrl,
+          })
+          .select();
+      };
+
+      let { data, error } = await insertProduct();
+      if (error) {
+        const message = (error.message || '').toLowerCase();
+        const isFk = message.includes('foreign key') || message.includes('products_user_id_fkey') || message.includes('users');
+        if (isFk) {
+          // Attempt to create user profile then retry once
+          const { error: profileErr } = await supabase
+            .from('users')
+            .upsert({
+              id: user.id,
+              email: user.email,
+              full_name: user.user_metadata?.full_name || 'User',
+            }, { onConflict: 'id' });
+          if (!profileErr) {
+            const retry = await insertProduct();
+            data = retry.data;
+            error = retry.error as any;
+          } else {
+            console.warn('Profile upsert also failed:', profileErr);
+          }
+        }
+      }
 
       if (error) throw error;
 
