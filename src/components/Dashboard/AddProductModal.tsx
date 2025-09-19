@@ -432,15 +432,28 @@ const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClose, onPr
       alert('Product added successfully!');
     } catch (error: any) {
       console.error('Error adding product:', error);
+      console.error('Error details:', {
+        message: error?.message,
+        code: error?.code,
+        details: error?.details,
+        hint: error?.hint
+      });
+      
       const msg = (error?.message || '').toLowerCase();
-      if (msg.includes('duplicate')) {
+      const code = error?.code || '';
+      
+      if (msg.includes('duplicate') || code === '23505') {
         alert('A product with this serial number already exists.');
       } else if (msg.includes('storage')) {
         alert('Failed to upload invoice. Please try again without the file.');
-      } else if (msg.includes('permission') || msg.includes('rls')) {
+      } else if (msg.includes('permission') || msg.includes('rls') || code === '42501') {
         alert('Permission denied. Please make sure you are logged in.');
+      } else if (msg.includes('foreign key') || code === '23503') {
+        alert('User profile issue. Please try logging out and back in.');
+      } else if (msg.includes('not null') || code === '23502') {
+        alert('Please fill in all required fields.');
       } else {
-        alert('Failed to add product. Please try again.');
+        alert(`Failed to add product: ${error?.message || 'Unknown error'}. Please check console for details.`);
       }
     } finally {
       setLoading(false);
